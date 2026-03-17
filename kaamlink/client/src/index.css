@@ -1,0 +1,23 @@
+/* File: client/src/index.css */
+/* Purpose: Tailwind CSS entry and global styles for KaamLink UI */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply font-sans text-gray-800 bg-gray-50;
+}
+
+button {
+  @apply rounded-xl transition-all duration-150 ease-out;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center px-4 py-2 bg-primary text-white font-semibold shadow-sm hover:bg-indigo-700 hover:scale-[1.02];
+}
+
+.card {
+  @apply rounded-2xl bg-white shadow-card hover:shadow-lg transition-shadow;
+}
+
