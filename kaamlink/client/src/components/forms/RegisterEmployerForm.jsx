@@ -9,22 +9,60 @@ import toast from 'react-hot-toast';
 const RegisterEmployerForm = ({ onSuccess }) => {
   const [type, setType] = useState('individual');
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm();
+
+  const sendOtp = async () => {
+    const email = getValues('email');
+    if (!email) {
+      toast.error('Enter your email address first');
+      return;
+    }
+
+    try {
+      await api.post('/auth/send-otp', { email });
+      setOtpSent(true);
+      setVerifiedEmail(email);
+      toast.success('OTP sent to your email');
+    } catch {
+      // errors via interceptor
+    }
+  };
 
   const onSubmit = async (data) => {
     try {
       setLoading(true);
+      if (!otpSent) {
+        toast.error('Please verify your email with OTP before registering');
+        return;
+      }
+
+      if (!data.otp) {
+        toast.error('Enter the OTP sent to your email');
+        return;
+      }
+
+      await api.post('/auth/verify-otp', {
+        email: verifiedEmail || data.email,
+        otp: data.otp,
+      });
+
       const res = await api.post('/auth/register', {
         name: data.name,
-        email: data.email,
+        email: verifiedEmail || data.email,
         phone: data.phone,
         password: data.password,
         role: 'employer',
       });
+
+      localStorage.setItem('kaamlink_token', res.data.token);
+      localStorage.setItem('kaamlink_user', JSON.stringify(res.data.user));
       toast.success('Employer account created');
       onSuccess?.(res.data);
     } catch {
@@ -51,19 +89,34 @@ const RegisterEmployerForm = ({ onSuccess }) => {
         <label className="block mb-1 font-medium text-gray-700">Phone</label>
         <input
           className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-          {...register('phone', { required: 'Phone is required' })}
+          {...register('phone')}
         />
-        {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone.message}</p>}
       </div>
 
       <div>
         <label className="block mb-1 font-medium text-gray-700">Email</label>
-        <input
-          type="email"
-          className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-          {...register('email')}
-        />
+        <div className="flex gap-2">
+          <input
+            type="email"
+            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            {...register('email', { required: 'Email is required' })}
+          />
+          <button type="button" onClick={sendOtp} className="px-3 py-2 text-xs rounded-xl border border-primary text-primary">
+            Send OTP
+          </button>
+        </div>
+        {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
       </div>
+
+      {otpSent && (
+        <div>
+          <label className="block mb-1 font-medium text-gray-700">OTP</label>
+          <input
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            {...register('otp', { required: 'OTP is required' })}
+          />
+        </div>
+      )}
 
       <div>
         <label className="block mb-1 font-medium text-gray-700">Password</label>

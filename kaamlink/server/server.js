@@ -25,14 +25,16 @@ const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 
 // Connect to MongoDB
-connectDB();
+connectDB().catch((error) => {
+    console.error('Mongo connection failed:', error.message);
+});
 
 // Middleware stack
 app.use(
-  cors({
-    origin: 'http://localhost:5173',
-    credentials: true,
-  })
+    cors({
+        origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'],
+        credentials: true,
+    })
 );
 app.use(helmet());
 app.use(morgan('dev'));
@@ -53,7 +55,7 @@ app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'KaamLink API is running' });
+    res.json({ status: 'ok', message: 'KaamLink API is running' });
 });
 
 // Global error handler
@@ -61,6 +63,5 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 KaamLink server running on port ${PORT}`);
+    console.log(`🚀 KaamLink server running on port ${PORT}`);
 });
-

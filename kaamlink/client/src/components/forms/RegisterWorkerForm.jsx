@@ -12,12 +12,10 @@ const RegisterWorkerForm = ({ onSuccess }) => {
   const [step, setStep] = useState(0);
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState(null);
-  const [phoneValue, setPhoneValue] = useState('');
+  const [verifiedEmail, setVerifiedEmail] = useState('');
   const {
     register,
     handleSubmit,
-    watch,
     getValues,
     formState: { errors },
   } = useForm();
@@ -25,16 +23,17 @@ const RegisterWorkerForm = ({ onSuccess }) => {
   const currentStepLabel = steps[step];
 
   const sendOtp = async () => {
+    const email = getValues('email');
+    if (!email) {
+      toast.error('Enter your email address first');
+      return;
+    }
+
     try {
-      const phone = getValues('phone');
-      if (!phone) {
-        toast.error('Enter phone number first');
-        return;
-      }
-      setPhoneValue(phone);
-      await api.post('/auth/send-otp', { phone });
+      await api.post('/auth/send-otp', { email });
       setOtpSent(true);
-      toast.success('OTP sent (mock, check server logs)');
+      setVerifiedEmail(email);
+      toast.success('OTP sent to your email');
     } catch {
       // interceptor handles toast
     }
@@ -48,22 +47,32 @@ const RegisterWorkerForm = ({ onSuccess }) => {
           toast.error('Passwords do not match');
           return;
         }
+        if (!otpSent) {
+          toast.error('Please verify your email with OTP before continuing');
+          return;
+        }
+        if (!data.otp) {
+          toast.error('Enter the OTP sent to your email');
+          return;
+        }
+
+        await api.post('/auth/verify-otp', {
+          email: verifiedEmail || data.email,
+          otp: data.otp,
+        });
+
         const res = await api.post('/auth/register', {
           name: data.name,
-          email: data.email,
+          email: verifiedEmail || data.email,
           phone: data.phone,
           password: data.password,
           role: 'worker',
         });
-        setUserId(res.data.user.id);
-        toast.success('Basic account created, verify OTP to continue');
+        localStorage.setItem('kaamlink_token', res.data.token);
+        localStorage.setItem('kaamlink_user', JSON.stringify(res.data.user));
+        toast.success('Account created, complete your profile');
         setStep(1);
       } else if (step === 1) {
-        // verify OTP if entered
-        if (otpSent && data.otp) {
-          await api.post('/auth/verify-otp', { phone: phoneValue || data.phone, otp: data.otp });
-          toast.success('Phone verified');
-        }
         await api.post(
           '/workers/profile',
           {
@@ -130,11 +139,19 @@ const RegisterWorkerForm = ({ onSuccess }) => {
               {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
             </div>
             <div>
-              <label className="block mb-1 font-medium text-gray-700">Phone</label>
+              <label className="block mb-1 font-medium text-gray-700">Phone (optional)</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                {...register('phone')}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium text-gray-700">Email</label>
               <div className="flex gap-2">
                 <input
+                  type="email"
                   className="flex-1 rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                  {...register('phone', { required: 'Phone is required' })}
+                  {...register('email', { required: 'Email is required' })}
                 />
                 <button
                   type="button"
@@ -144,24 +161,17 @@ const RegisterWorkerForm = ({ onSuccess }) => {
                   Send OTP
                 </button>
               </div>
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
             </div>
             {otpSent && (
               <div>
                 <label className="block mb-1 font-medium text-gray-700">OTP</label>
                 <input
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                  {...register('otp')}
+                  {...register('otp', { required: 'OTP is required' })}
                 />
               </div>
             )}
-            <div>
-              <label className="block mb-1 font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                {...register('email')}
-              />
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 font-medium text-gray-700">Password</label>

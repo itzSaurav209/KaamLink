@@ -35,10 +35,12 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = (jwt, userData) => {
-    localStorage.setItem('kaamlink_token', jwt);
-    setToken(jwt);
-    setUser(userData);
-  };
+  localStorage.setItem('kaamlink_token', jwt);
+  localStorage.setItem('kaamlink_user', JSON.stringify(userData));
+
+  setToken(jwt);
+  setUser(userData);
+};
 
   const logout = async () => {
     try {
@@ -47,6 +49,7 @@ export const AuthProvider = ({ children }) => {
       // Ignore network/logout errors for client-side clearing
     }
     localStorage.removeItem('kaamlink_token');
+    localStorage.removeItem('kaamlink_user');
     setToken(null);
     setUser(null);
     toast.success('Logged out');
