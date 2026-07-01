@@ -63,12 +63,16 @@ const WorkerDashboard = () => {
         <div>
           <p className="text-sm text-gray-500 mb-1">Welcome back</p>
           <h1 className="text-xl font-semibold text-gray-900">{user?.name}</h1>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {profile?.isVerified ? (
               <Badge text="Verified" variant="approved" />
             ) : (
               <Badge text={profile?.verificationStatus || 'pending'} variant="pending" />
             )}
+            <Badge
+              text={user?.isPhoneVerified ? 'Phone verified' : 'Phone pending'}
+              variant={user?.isPhoneVerified ? 'approved' : 'pending'}
+            />
           </div>
         </div>
         <div className="text-right text-sm">

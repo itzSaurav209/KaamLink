@@ -85,6 +85,11 @@ const EmployerDashboard = () => {
           <div>
             <p className="text-xs text-gray-500 mb-1">Welcome</p>
             <h1 className="text-xl font-semibold text-gray-900">{user?.name}</h1>
+            <div className="mt-2">
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${user?.isPhoneVerified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                {user?.isPhoneVerified ? 'Phone verified' : 'Phone verification pending'}
+              </span>
+            </div>
           </div>
         </div>
         <div className="grid md:grid-cols-3 gap-4">

@@ -37,6 +37,11 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    firebaseUid: {
+        type: String,
+        trim: true,
+        sparse: true,
+    },
     otp: {
         type: String,
     },

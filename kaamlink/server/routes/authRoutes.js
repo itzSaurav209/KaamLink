@@ -7,6 +7,7 @@ const {
     register,
     sendOtp,
     verifyOtp,
+    verifyPhone,
     login,
     logout,
     getMe,
@@ -26,6 +27,7 @@ router.post(
 
 router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
+router.post('/verify-phone', verifyToken, verifyPhone);
 
 router.post(
     '/login', [

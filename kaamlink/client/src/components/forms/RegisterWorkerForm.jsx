@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { confirmPhoneOtp, resetPhoneRecaptcha, sendPhoneOtp } from '../../firebase';
 
 const steps = ['Personal Info', 'Work Details', 'Verification'];
 
@@ -13,6 +14,11 @@ const RegisterWorkerForm = ({ onSuccess }) => {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneVerificationPending, setPhoneVerificationPending] = useState(false);
+  const [phoneConfirmation, setPhoneConfirmation] = useState(null);
+  const [phoneOtpLoading, setPhoneOtpLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const {
     register,
     handleSubmit,
@@ -36,6 +42,63 @@ const RegisterWorkerForm = ({ onSuccess }) => {
       toast.success('OTP sent to your email');
     } catch {
       // interceptor handles toast
+    }
+  };
+
+  const handleSendPhoneOtp = async () => {
+    const phone = getValues('phone');
+    if (!phone) {
+      toast.error('Enter your phone number first');
+      return;
+    }
+
+    try {
+      setPhoneOtpLoading(true);
+      const confirmation = await sendPhoneOtp(phone);
+      setPhoneConfirmation(confirmation);
+      setPhoneOtpSent(true);
+      setPhoneVerificationPending(true);
+      toast.success('Phone OTP sent');
+    } catch (error) {
+      const message = error?.message || 'Unable to send phone OTP';
+      toast.error(message);
+    } finally {
+      setPhoneOtpLoading(false);
+    }
+  };
+
+  const handleVerifyPhone = async () => {
+    const phone = getValues('phone');
+    const otp = getValues('phoneOtp');
+
+    if (!phone || !otp) {
+      toast.error('Enter your phone number and OTP');
+      return;
+    }
+
+    try {
+      setPhoneOtpLoading(true);
+      const result = await confirmPhoneOtp(phoneConfirmation, otp);
+      const res = await api.post('/auth/verify-phone', {
+        phone,
+        firebaseUid: result?.user?.uid,
+      });
+
+      const currentUser = JSON.parse(localStorage.getItem('kaamlink_user') || '{}');
+      const updatedUser = { ...currentUser, ...(res.data?.user || {}) };
+      localStorage.setItem('kaamlink_user', JSON.stringify(updatedUser));
+      setPhoneVerified(true);
+      setPhoneVerificationPending(false);
+      setPhoneOtpSent(false);
+      resetPhoneRecaptcha();
+      setPhoneConfirmation(null);
+      toast.success('Phone verified successfully');
+      setStep(1);
+    } catch (error) {
+      const message = error?.message || 'Phone verification failed';
+      toast.error(message);
+    } finally {
+      setPhoneOtpLoading(false);
     }
   };
 
@@ -70,6 +133,13 @@ const RegisterWorkerForm = ({ onSuccess }) => {
         });
         localStorage.setItem('kaamlink_token', res.data.token);
         localStorage.setItem('kaamlink_user', JSON.stringify(res.data.user));
+
+        if (data.phone) {
+          await handleSendPhoneOtp();
+          toast.success('Account created. Complete phone verification to unlock login.');
+          return;
+        }
+
         toast.success('Account created, complete your profile');
         setStep(1);
       } else if (step === 1) {
@@ -139,11 +209,39 @@ const RegisterWorkerForm = ({ onSuccess }) => {
               {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
             </div>
             <div>
-              <label className="block mb-1 font-medium text-gray-700">Phone (optional)</label>
-              <input
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                {...register('phone')}
-              />
+              <label className="block mb-1 font-medium text-gray-700">Phone</label>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                  {...register('phone')}
+                />
+                <button
+                  type="button"
+                  onClick={handleSendPhoneOtp}
+                  disabled={phoneOtpLoading || phoneVerified}
+                  className="px-3 py-2 text-xs rounded-xl border border-primary text-primary disabled:opacity-60"
+                >
+                  {phoneOtpLoading ? 'Sending...' : phoneOtpSent ? 'Resend' : 'Verify Phone'}
+                </button>
+              </div>
+              <div id="recaptcha-container" className="hidden" />
+              {phoneVerificationPending && (
+                <div className="mt-2 space-y-2">
+                  <input
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Enter phone OTP"
+                    {...register('phoneOtp')}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyPhone}
+                    disabled={phoneOtpLoading || phoneVerified}
+                    className="btn-primary w-full justify-center disabled:opacity-60"
+                  >
+                    {phoneOtpLoading ? 'Verifying...' : 'Confirm Phone OTP'}
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <label className="block mb-1 font-medium text-gray-700">Email</label>

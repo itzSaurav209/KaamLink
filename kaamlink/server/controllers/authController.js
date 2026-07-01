@@ -8,6 +8,11 @@ const WorkerProfile = require('../models/WorkerProfile');
 const generateToken = require('../utils/generateToken');
 const { generateOTP, storeOTP, verifyOTP } = require('../utils/mockOtp');
 
+const normalizePhone = (value) => {
+    if (!value) return '';
+    return value.toString().trim();
+};
+
 // Helper to send validation errors in a consistent format
 const handleValidation = (req, res) => {
     const errors = validationResult(req);
@@ -25,7 +30,7 @@ const register = async(req, res) => {
     try {
         const { name, email, phone, password, role } = req.body;
         const normalizedEmail = email ? email.toLowerCase().trim() : '';
-        const normalizedPhone = phone ? phone.toString().trim() : '';
+        const normalizedPhone = normalizePhone(phone);
 
         if (!normalizedEmail) {
             return res.status(400).json({ message: 'Email is required' });
@@ -48,6 +53,7 @@ const register = async(req, res) => {
             ...(normalizedPhone ? { phone: normalizedPhone } : {}),
             passwordHash,
             role: role || 'employer',
+            isPhoneVerified: Boolean(normalizedPhone ? false : true),
         });
 
         if (user.role === 'worker') {
@@ -131,6 +137,46 @@ const verifyOtpController = async(req, res) => {
     }
 };
 
+// POST /api/auth/verify-phone
+const verifyPhone = async(req, res) => {
+    try {
+        const { phone, firebaseUid } = req.body;
+        const normalizedPhone = normalizePhone(phone);
+
+        if (!normalizedPhone) {
+            return res.status(400).json({ message: 'Phone number is required' });
+        }
+
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.phone = normalizedPhone;
+        user.isPhoneVerified = true;
+        if (firebaseUid) {
+            user.firebaseUid = firebaseUid;
+        }
+        await user.save();
+
+        res.json({
+            message: 'Phone verified successfully',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                role: user.role,
+                isEmailVerified: user.isEmailVerified,
+                isPhoneVerified: user.isPhoneVerified,
+            },
+        });
+    } catch (error) {
+        console.error('Verify phone error:', error);
+        res.status(500).json({ message: 'Failed to verify phone' });
+    }
+};
+
 // POST /api/auth/login
 const login = async(req, res) => {
     const validationError = handleValidation(req, res);
@@ -147,6 +193,13 @@ const login = async(req, res) => {
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.isPhoneVerified) {
+            return res.status(403).json({
+                message: 'Phone verification required before login',
+                requiresPhoneVerification: true,
+            });
         }
 
         const token = generateToken(user._id);
@@ -192,6 +245,7 @@ module.exports = {
     register,
     sendOtp,
     verifyOtp: verifyOtpController,
+    verifyPhone,
     login,
     logout,
     getMe,
